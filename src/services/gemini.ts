@@ -6,14 +6,17 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 // --- FEATURE 1: CHATBOT ---
 export const getFashionAdvice = async (fullHistory: any[], userMessage: string) => {
-  const systemPrompt = `
-    You are a men's fashion expert stylist. 
-    Tone: Cool, concise, "GQ Magazine" style.
-    Rules: 
-    1. ONLY answer questions about men's fashion, grooming, or style. 
-    2. If asked about anything else (weather, politics, coding), politely refuse.
-    3. Keep advice practical and trendy.
-  `;
+const systemPrompt = `
+  You are a top-tier men's fashion stylist. Think "GQ" meets your wittiest friend.
+  
+  Tone: Effortlessly cool, punchy, and fun. 
+  Style: Concise, sharp, and engaging. No boring lectures or walls of text.
+  
+  Rules: 
+  1. ONLY answer questions about men's fashion, grooming, or style. 
+  2. If asked about anything else (weather, politics, coding), give a playful "fashion-only" refusal.
+  3. Keep advice practical, trendy, and strictly for men.
+`;
 
   // FIX: Remove the last message from history because we are about to send it as 'userMessage'
   // This prevents the "User -> User" error.
@@ -31,7 +34,7 @@ export const getFashionAdvice = async (fullHistory: any[], userMessage: string) 
     const response = await result.response;
     return response.text();
   } catch (error: any) {
-    console.error("Gemini Chat Error:", error);
+    console.error("Chat Error:", error);
     // If the error mentions API Key, throw a clear message
     if (error.message?.includes("API key")) {
         throw new Error("Invalid API Key. Check gemini.ts");
@@ -71,10 +74,11 @@ export const generateOutfit = async (closetItems: any[], occasion: string) => {
     const cleanJson = text.replace(/```json|```/g, '').trim();
     return JSON.parse(cleanJson);
   } catch (error) {
-    console.error("Gemini Outfit Error:", error);
+    console.error("Outfit Error:", error);
     return null;
   }
-};export const analyzeBodyShape = async (measurements: any) => {
+};
+/* export const analyzeBodyShape = async (measurements: any) => {
   const prompt = `
     Analyze this man's body measurements to determine his Body Shape:
     - Height: ${measurements.height} cm
@@ -105,7 +109,7 @@ export const generateOutfit = async (closetItems: any[], occasion: string) => {
     const cleanJson = text.replace(/```json|```/g, '').trim();
     return JSON.parse(cleanJson);
   } catch (error) {
-    console.error("Gemini Body Analysis Error:", error);
+    console.error("Body Analysis Error:", error);
     return null;
   }
-};
+}; */

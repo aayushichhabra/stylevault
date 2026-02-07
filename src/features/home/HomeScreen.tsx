@@ -13,6 +13,15 @@ import { generateOutfit } from '../../services/gemini';
 
 const { width } = Dimensions.get('window');
 
+const getWeatherCondition = (code: number) => {
+  if (code === 0) return 'Clear Sky';
+  if (code >= 1 && code <= 3) return 'Partly Cloudy';
+  if (code >= 45 && code <= 48) return 'Foggy';
+  if (code >= 51 && code <= 67) return 'Rainy';
+  if (code >= 71 && code <= 77) return 'Snowy';
+  if (code >= 95) return 'Thunderstorm';
+  return 'Cloudy';
+};
 const HomeScreen = ({ navigation }: any) => {
   // --- STATE ---
   const [weather, setWeather] = useState({ temp: '24', condition: 'Sunny' });
@@ -66,14 +75,37 @@ const HomeScreen = ({ navigation }: any) => {
     }
   };
 
+// --- 1. FETCH DATA ---
+  // ... fetchData code remains the same ...
+
+  // ✅ UPDATED: Fetch REAL Weather using Open-Meteo (No Key Required)
   const fetchWeather = async () => {
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-      // Mock weather for now
-      setWeather({ temp: '22', condition: 'Sunny' }); 
+      if (status !== 'granted') {
+        Alert.alert("Permission Denied", "We need location access to show local weather.");
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+
+      // Free API call
+      const response = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`
+      );
+      const data = await response.json();
+
+      if (data.current_weather) {
+        setWeather({
+          temp: Math.round(data.current_weather.temperature).toString(),
+          condition: getWeatherCondition(data.current_weather.weathercode)
+        });
+      }
     } catch (error) {
       console.log("Weather Error: ", error);
+      // Fallback if API fails
+      setWeather({ temp: '--', condition: 'Unavailable' });
     }
   };
 
@@ -146,13 +178,13 @@ const HomeScreen = ({ navigation }: any) => {
     }
   };
 
-  // --- RENDER HELPERS ---
+// --- RENDER HELPERS ---
   const renderDailyPick = () => {
     if (loadingAI) {
       return (
         <View style={[styles.heroCard, styles.heroCentered]}>
           <ActivityIndicator size="large" color="#000" />
-          <Text style={styles.loadingText}>Gemini is analyzing your wardrobe...</Text>
+          <Text style={styles.loadingText}>StyleVault is curating your look...</Text>
         </View>
       );
     }
@@ -173,21 +205,32 @@ const HomeScreen = ({ navigation }: any) => {
                ))}
             </View>
 
-            <TouchableOpacity 
-              style={styles.saveButton} 
-              onPress={handleSaveLook}
-              disabled={isSaving}
-            >
-              {isSaving ? (
-                <ActivityIndicator size="small" color="#FFF" />
-              ) : (
-                <Ionicons name="heart" size={24} color="#FFF" />
-              )}
-            </TouchableOpacity>
+            {/* ✅ NEW: Reload Button (Top Right, next to Heart) */}
+            <View style={styles.actionRow}>
+              <TouchableOpacity 
+                style={styles.iconButton} 
+                onPress={handleSuggest} // Triggers AI again
+                disabled={isSaving}
+              >
+                <Ionicons name="refresh" size={22} color="#FFF" />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.iconButton, { marginLeft: 10 }]} 
+                onPress={handleSaveLook}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <Ionicons name="heart" size={22} color="#FFF" />
+                )}
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.heroOverlay}>
               <View style={styles.aiBadge}>
-                <Text style={styles.aiText}>✨ Gemini Stylist</Text>
+                <Text style={styles.aiText}>✨ StyleVault Stylist</Text>
               </View>
               <Text style={styles.lookTitle}>Today's Look</Text>
               <Text style={styles.lookDesc}>{reasoning}</Text>
@@ -196,6 +239,7 @@ const HomeScreen = ({ navigation }: any) => {
       );
     } 
     
+    // ... existing "Empty State" code (heroEmpty) ...
     else {
       return (
         <TouchableOpacity style={[styles.heroCard, styles.heroEmpty]} activeOpacity={1}>
@@ -203,7 +247,7 @@ const HomeScreen = ({ navigation }: any) => {
               <MaterialCommunityIcons name="sparkles" size={40} color="#333" />
               <Text style={styles.emptyTitle}>No Outfit Selected</Text>
               <Text style={styles.emptySub}>
-                You have {closet.length} items ready. Let's find a combo for this weather.
+                You have {closet.length} items ready. Let's find a combo for {weather.temp}°C.
               </Text>
               <TouchableOpacity style={styles.generateBtn} onPress={handleSuggest}>
                 <Text style={styles.generateBtnText}>Get Today's Fit</Text>
@@ -267,7 +311,7 @@ const HomeScreen = ({ navigation }: any) => {
           <View>
             <Text style={styles.greetingSub}>Hello,</Text>
             <Text style={styles.greetingMain}>
-              {auth.currentUser?.displayName?.split(' ')[0] || "Aayushi"}
+              {auth.currentUser?.displayName?.split(' ')[0]}
             </Text>
           </View>
           <View style={styles.headerRight}>
@@ -342,8 +386,18 @@ const styles = StyleSheet.create({
   heroCentered: { justifyContent: 'center', alignItems: 'center', backgroundColor: '#F9FAFB' },
   collageContainer: { flexDirection: 'row', flexWrap: 'wrap', height: '100%', width: '100%', position: 'absolute' },
   collageImage: { height: '100%', resizeMode: 'cover' },
+
+  actionRow: { position: 'absolute', top: 15, right: 15, flexDirection: 'row', zIndex: 10 },
   
-  saveButton: { position: 'absolute', top: 15, right: 15, backgroundColor: 'rgba(0,0,0,0.5)', padding: 10, borderRadius: 25, zIndex: 10 },
+  iconButton: { 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    justifyContent: 'center', 
+    alignItems: 'center'
+  },
+
   heroOverlay: { marginTop: 220, padding: 24, backgroundColor: 'rgba(0,0,0,0.6)', flex: 1, justifyContent: 'flex-end' },
   
   heroEmpty: { backgroundColor: '#F9FAFB', borderWidth: 2, borderColor: '#EEEEEE', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', minHeight: 350 },
