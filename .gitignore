@@ -41,5 +41,7 @@ yarn-error.*
 /android
 
 
+
+config/
 .DS_Store
 *.env
